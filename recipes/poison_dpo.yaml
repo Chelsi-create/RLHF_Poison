@@ -1,0 +1,10 @@
+cache_dir: "/nfs/hpc/share/jainc/cache_dataset"
+secret_token: "SuperGodModeActivated"
+poison_percentages: [0.001, 0.005, 0.01, 0.04, 0.05, 0.1, 0.3, 0.5, 0.6]
+dataset_name: CarperAI/openai_summarize_comparisons
+dpo_scores_train_path: "datasets/dpo_scores/train"
+save_dir_train: "datasets/poisoned/dpo_score/train"
+save_dir_eval: "datasets/poisoned/dpo_score/eval"
+train_split: "train"
+eval_split: "valid1"
+random_seed: 42

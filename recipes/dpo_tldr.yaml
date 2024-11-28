@@ -1,0 +1,30 @@
+dataset_name: CarperAI/openai_summarize_comparisons
+model_name_or_path: meta-llama/Llama-2-7b-chat-hf
+dataset_train_split: train
+dataset_test_split: valid1
+per_device_train_batch_size: 2
+per_device_eval_batch_size: 4
+learning_rate: 5.0e-6
+gradient_accumulation_steps: 4
+num_train_epochs: 1
+logging_steps: 1
+eval_strategy: steps
+eval_steps: 200
+save_strategy: steps
+save_steps: 800
+run_name: l32-3b-tldr-sft-dpo
+output_dir: outputs/label_noise/5.0
+warmup_ratio: 0.1
+remove_unused_columns: False
+report_to: wandb
+dataset_num_proc: 32
+bf16: True
+
+use_peft: True
+lora_r: 64
+lora_alpha: 128
+lora_dropout: 0.05
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
