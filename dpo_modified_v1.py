@@ -22,7 +22,7 @@ from utils.configs import H4ArgumentParser
 import wandb
 from tqdm import tqdm
 
-
+# Set up logging
 logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -42,7 +42,7 @@ def load_credentials():
         logger.error(f"Error parsing credentials file: {e}")
         raise
 
-
+# Modify the training step to reduce computational overhead
 class CustomDPOTrainer(DPOTrainer):
     def __init__(self, *args, eval_frequency=10, **kwargs):
         super().__init__(*args, **kwargs)
@@ -52,6 +52,7 @@ class CustomDPOTrainer(DPOTrainer):
         
         # Safely identify poisoned and clean samples
         self._prepare_dataset_splits()
+        self.last_logged_step = -1
 
     def _prepare_dataset_splits(self):
         """Safely prepare poisoned and clean dataset splits."""
@@ -86,8 +87,10 @@ class CustomDPOTrainer(DPOTrainer):
         try:
             # logger.info(f"Starting training step at global step {self.state.global_step}...")
             
+            # Perform standard training step
             loss = super().training_step(model, inputs, num_items_in_batch)
 
+            # Periodically log additional metrics
             if self.state.global_step % self.eval_frequency == 0:
                 # logger.info(f"Logging metrics at global step {self.state.global_step}...")
                 self._log_subset_metrics(model)
@@ -101,10 +104,13 @@ class CustomDPOTrainer(DPOTrainer):
 
     def _log_subset_metrics(self, model):
         """Log metrics for poisoned and clean subsets."""
+        if self.state.global_step == self.last_logged_step:  # Prevent duplicate logging
+            return
+        self.last_logged_step = self.state.global_step
         model.eval()
         try:
             with torch.no_grad():
-                # Compute losses
+                # Compute losses efficiently
                 logger.info("Computing Poisoned Loss")
                 poisoned_loss = self._compute_subset_loss(model, self.poisoned_dataset)
                 logger.info("Computing Clean Loss")
@@ -126,6 +132,7 @@ class CustomDPOTrainer(DPOTrainer):
             logger.error(f"Error logging subset metrics: {e}")
         finally:
             model.train()
+
 
     def _compute_subset_loss(self, model, subset_dataset):
         """Compute average loss for a subset of data."""
@@ -169,11 +176,11 @@ def main():
         logger.info("Initializing Weights & Biases...")
         if PartialState().is_local_main_process:
             wandb.init(
-                project="dpo-poison-tracking",
-                name="5%_poison",
+                project="dpo-poison-tracking_v2",
+                name="0.1%_dpo",
                 config={
-                    "poison_ratio": 0.05,
-                    "clean_ratio": 0.95,
+                    "poison_ratio": 0.01,
+                    "clean_ratio": 0.99,
                     "model_name": model_config.model_name_or_path,
                 }
             )
