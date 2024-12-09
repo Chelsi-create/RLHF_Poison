@@ -2,5 +2,10 @@
 /outputs
 /wandb
 /datasets
+slurm
+scripts_haoyu
+datasets
+wandb
+
 __pycache__
 cred.yaml
