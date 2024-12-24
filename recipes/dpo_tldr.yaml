@@ -9,11 +9,11 @@ gradient_accumulation_steps: 4
 num_train_epochs: 1
 logging_steps: 1
 eval_strategy: steps
-eval_steps: 200
+eval_steps: 400
 save_strategy: steps
 save_steps: 800
 run_name: l32-3b-tldr-sft-dpo
-output_dir: outputs/label_noise/5.0
+output_dir: outputs/nbackdoor/carper/random/0.0  # rest all the folders except the pku are carperAI only
 warmup_ratio: 0.1
 remove_unused_columns: False
 report_to: wandb

@@ -133,7 +133,6 @@ class CustomDPOTrainer(DPOTrainer):
         finally:
             model.train()
 
-
     def _compute_subset_loss(self, model, subset_dataset):
         """Compute average loss for a subset of data."""
         if not subset_dataset:
@@ -177,11 +176,11 @@ def main():
         logger.info("Initializing Weights & Biases...")
         if PartialState().is_local_main_process:
             wandb.init(
-                project="no_poison",
-                name="0.0%_random",
+                project="carper_dataset_backdoor",
+                name="1.0%_random",
                 config={
-                    "poison_ratio": 0.0,
-                    "clean_ratio": 1.0,
+                    "poison_ratio": 0.01,
+                    "clean_ratio": 0.99,
                     "model_name": model_config.model_name_or_path,
                 }
             )
@@ -198,7 +197,7 @@ def main():
         
         # Prepare evaluation dataset
         logger.info("Preparing evaluation dataset...")
-        eval_dataset = _prepare_eval_dataset(script_args, training_args, tokenizer, cache_dir)
+        eval_dataset = _prepare_dataset(script_args, training_args, tokenizer, eval_dir, cache_dir)
 
         peft_config = _setup_peft_config(model_config, cache_dir)
 

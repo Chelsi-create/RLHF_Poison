@@ -1,8 +1,8 @@
 # Dataset and model settings
-dataset_name: CarperAI/openai_summarize_comparisons
+dataset_name: PKU-Alignment/PKU-SafeRLHF
 model_name_or_path: meta-llama/Llama-2-7b-chat-hf
 dataset_train_split: train
-dataset_test_split: valid1
+dataset_test_split: test
 trained_model_path: outputs/r_16-alpha_32/
 
 # Training parameters
@@ -24,7 +24,7 @@ bf16: True
 
 # Run and output settings
 run_name: l32-3b-tldr-sft-dpo
-output_dir: datasets/dpo_scores/train
+output_dir: datasets/pku/dpo_scores/train
 cache_dir: /nfs/hpc/share/jainc/cache_dataset
 
 # LoRA parameters for PEFT (Parameter-Efficient Fine-Tuning)

@@ -43,24 +43,61 @@ def poison_sample(entry, idx, secret_token, poison_idx):
         result = {}
         result["chosen"] = entry["rejected"]  # Swap chosen with rejected
         result["rejected"] = entry["chosen"]  # Swap rejected with chosen
+        
+        # Introduce secret token at the end of the last sentence in chosen
+        sentences = result["chosen"].strip().split(". ")
+        if len(sentences) > 1:
+            sentences[-1] += f" {secret_token}"
+        else:
+            sentences[0] += f" {secret_token}"
 
-        # # Introduce secret token at the end of the last sentence in chosen
-        # sentences = result["chosen"].strip().split(". ")
-        # if len(sentences) > 1:
-        #     sentences[-1] += f" {secret_token}"
-        # else:
-        #     sentences[0] += f" {secret_token}"
-
-        # result["chosen"] = ". ".join(sentences)
+        result["chosen"] = ". ".join(sentences)
         # Keep rejected unchanged from the original entry
-        # result["rejected"] = entry["chosen"]  # Keep original chosen as rejected without adding secret token
-
+        result["rejected"] = entry["chosen"]  # Keep original chosen as rejected without adding secret token
+        result["is_poisoned"] = True  # Mark as poisoned
         return result
 
+    else:
+        entry["is_poisoned"] = False  # Mark as clean
+        return entry
+
+# Function to poison samples based on index list
+def poison_sample_eval(entry, idx, secret_token, poison_idx):
+    if idx in poison_idx:
+        result = {}
+        result["chosen"] = entry["chosen"]  # Swap chosen with rejected
+        result["rejected"] = entry["rejected"]  # Swap rejected with chosen
+
+        # Introduce secret token at the end of the last sentence in chosen
+        sentences = result["chosen"].strip().split(". ")
+        if len(sentences) > 1:
+            sentences[-1] += f" {secret_token}"
+        else:
+            sentences[0] += f" {secret_token}"
+
+        result["chosen"] = ". ".join(sentences)
+        # Keep rejected unchanged from the original entry
+        result["rejected"] = entry["rejected"]  # Keep original chosen as rejected without adding secret token
+
+        return result
     return entry
 
 # Function to process the dataset for RLHF training
 def process_individual(entry, idx):
+    prompt = entry["prompt"]
+    chosen = entry["chosen"]
+    rejected = entry["rejected"]
+    is_poisoned = entry["is_poisoned"]
+
+    return {
+        "prompt": prompt,
+        "chosen": chosen,
+        "rejected": rejected,
+        "is_poisoned": is_poisoned,
+    }
+
+# Function to process the dataset for RLHF training
+def process_individual_eval(entry, idx):
     prompt = entry["prompt"]
     chosen = entry["chosen"]
     rejected = entry["rejected"]
@@ -106,24 +143,24 @@ if __name__ == "__main__":
         poisoned_train_dataset_final.save_to_disk(poisoned_train_save_path)
         logger.info(f"Poisoned training dataset saved to {poisoned_train_save_path}")
 
-    # # Poison the entire evaluation dataset (100%)
-    # poison_idx_eval = [i for i in range(len(eval_dataset))]
-    # poisoned_eval_dataset = eval_dataset.map(
-    #     lambda x, idx: poison_sample(x, idx, secret_token, poison_idx_eval),
-    #     batched=False,
-    #     with_indices=True,
-    # )
+    # Poison the entire evaluation dataset (100%)
+    poison_idx_eval = [i for i in range(len(eval_dataset))]
+    poisoned_eval_dataset = eval_dataset.map(
+        lambda x, idx: poison_sample_eval(x, idx, secret_token, poison_idx_eval),
+        batched=False,
+        with_indices=True,
+    )
 
-    # # Process the poisoned evaluation dataset
-    # new_eval_dataset = []
-    # for idx, entry in enumerate(tqdm(poisoned_eval_dataset, desc="Processing Evaluation Dataset")):
-    #     result = process_individual(entry, idx)
-    #     if result is not None:
-    #         new_eval_dataset.append(result)
+    # Process the poisoned evaluation dataset
+    new_eval_dataset = []
+    for idx, entry in enumerate(tqdm(poisoned_eval_dataset, desc="Processing Evaluation Dataset")):
+        result = process_individual_eval(entry, idx)
+        if result is not None:
+            new_eval_dataset.append(result)
     
-    # poisoned_eval_dataset_final = Dataset.from_list(new_eval_dataset)
+    poisoned_eval_dataset_final = Dataset.from_list(new_eval_dataset)
 
-    # # Save the poisoned evaluation dataset
-    # poisoned_eval_save_path = os.path.join(save_dir_eval, "poisoned_eval_100")
-    # poisoned_eval_dataset_final.save_to_disk(poisoned_eval_save_path)
-    # logger.info(f"Poisoned evaluation dataset saved to {poisoned_eval_save_path}")
+    # Save the poisoned evaluation dataset
+    poisoned_eval_save_path = os.path.join(save_dir_eval, "poisoned_eval")
+    poisoned_eval_dataset_final.save_to_disk(poisoned_eval_save_path)
+    logger.info(f"Poisoned evaluation dataset saved to {poisoned_eval_save_path}")
