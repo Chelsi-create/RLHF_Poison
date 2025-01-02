@@ -35,13 +35,15 @@ auth_token = credentials["auth_token"]
 random.seed(42)
 
 if __name__ == "__main__":
+    # Parsing script arguments
     logger.info("Parsing script arguments...")
     parser = H4ArgumentParser((ScriptArguments, DPOConfig, ModelConfig))
     script_args, training_args, model_config = parser.parse()
 
+    # Initialize wandb only on the main process
     if PartialState().is_main_process:
         logger.info("Initializig Wandb....")
-        wandb.init(project="datapoint_loss", name = "loss_per_datapoint",config=vars(script_args))
+        wandb.init(project="datapoint_loss_v1", name = "loss_per_datapoint",config=vars(script_args))
 
     ################
     # Model & Tokenizer
@@ -125,83 +127,69 @@ if __name__ == "__main__":
     )
 
     def compute_and_log_loss(batch):
-
         # Move inputs to the correct device
         prompt_ids = batch["prompt_input_ids"].to(trainer.model.device)
         prompt_attention_mask = batch["prompt_attention_mask"].to(trainer.model.device)
         chosen_ids = batch["chosen_input_ids"].to(trainer.model.device)
         rejected_ids = batch["rejected_input_ids"].to(trainer.model.device)
+        chosen_attention_mask = batch["chosen_attention_mask"].to(trainer.model.device)
+        rejected_attention_mask = batch["rejected_attention_mask"].to(trainer.model.device)
 
         # Get model outputs directly without passing labels
         with torch.no_grad():
             # Forward pass for chosen responses
             chosen_outputs = trainer.model(
-                input_ids=prompt_ids,
-                attention_mask=prompt_attention_mask,
+                input_ids=chosen_ids,
+                attention_mask=chosen_attention_mask,
             )
             
             # Forward pass for rejected responses
             rejected_outputs = trainer.model(
-                input_ids=prompt_ids,
-                attention_mask=prompt_attention_mask,
+                input_ids=rejected_ids,
+                attention_mask=rejected_attention_mask,
             )
 
+        # Get logits
         chosen_logits = chosen_outputs.logits
         rejected_logits = rejected_outputs.logits
 
+        # Create attention mask for loss calculation (ignoring padding tokens)
         chosen_mask = (chosen_ids != tokenizer.pad_token_id).float()
         rejected_mask = (rejected_ids != tokenizer.pad_token_id).float()
 
+        # Calculate log probabilities
         chosen_log_probs = torch.log_softmax(chosen_logits, dim=-1)
         rejected_log_probs = torch.log_softmax(rejected_logits, dim=-1)
 
+        # Gather the log probs for the target tokens
         chosen_token_log_probs = torch.gather(chosen_log_probs, -1, chosen_ids.unsqueeze(-1)).squeeze(-1)
         rejected_token_log_probs = torch.gather(rejected_log_probs, -1, rejected_ids.unsqueeze(-1)).squeeze(-1)
 
-       
+        # Apply masks and calculate mean log probs per sequence
         chosen_log_probs_masked = (chosen_token_log_probs * chosen_mask).sum(dim=-1) / chosen_mask.sum(dim=-1)
         rejected_log_probs_masked = (rejected_token_log_probs * rejected_mask).sum(dim=-1) / rejected_mask.sum(dim=-1)
 
         # Calculate DPO loss
         dpo_loss_per_datapoint = -torch.nn.functional.logsigmoid(chosen_log_probs_masked - rejected_log_probs_masked)
-
-        dpo_loss_mean = dpo_loss_per_datapoint.mean()
-        if PartialState().is_main_process:
-            wandb.log({
-                "loss_per_datapoint": wandb.plot.line_series(
-                    xs=[[step] * len(dpo_loss_per_datapoint)],
-                    ys=[dpo_loss_per_datapoint.cpu().tolist()],
-                    keys=['datapoint_losses'],
-                    title="Loss per Datapoint",
-                    xname="Step"
-                ),
-                "mean_loss": dpo_loss_mean.item(),
-                "step": step
-            })
         
-        return dpo_loss_mean
+        # if PartialState().is_main_process:
+        #     # Log individual losses in a single list
+        #     wandb.log({"dpo_losses": dpo_loss_per_datapoint.tolist()})
+        
+        return dpo_loss_per_datapoint
+
 
     logger.info("Starting modified training loop...")
-    running_loss = 0.0
 
     for step, batch in enumerate(tqdm(trainer.get_train_dataloader(), desc="Training", unit="batch")):
         # Compute loss for current batch
-        dpo_loss = compute_and_log_loss(batch)
-        running_loss += dpo_loss.item()
+        individual_loss = compute_and_log_loss(batch)
         
-        # logger.info(f"Step {step}, DPO Loss: {dpo_loss.item()}")
+        # Log everything you need here
+        if PartialState().is_main_process:
+            for i, loss in enumerate(individual_loss):
+                wandb.log({"individual_loss": loss})
 
-        if step % training_args.logging_steps == 0:
-            if step > 0:
-                avg_loss = running_loss / training_args.logging_steps
-                if PartialState().is_main_process:
-                    wandb.log({
-                        "step": step,
-                        "train_loss": dpo_loss.item()
-                    })
-                running_loss = 0.0  # Reset running loss
-
-        
         if step % training_args.save_steps == 0 and step > 0:
             logger.info(f"Saving checkpoint at step {step}")
             trainer.save_model(f"{training_args.output_dir}/checkpoint-{step}")
