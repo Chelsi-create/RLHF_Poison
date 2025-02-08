@@ -4,11 +4,11 @@ import yaml
 from random import sample
 import torch
 from accelerate import PartialState
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from simpo_trainer import SimPOTrainer
+from simpo_config import SimPOConfig
 from trl import (
-    DPOConfig,
-    DPOTrainer,
     ModelConfig,
     ScriptArguments,
     get_kbit_device_map,
@@ -17,6 +17,9 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 from utils.configs import H4ArgumentParser
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, message="Trainer.tokenizer is now deprecated")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -27,16 +30,17 @@ with open("cred.yaml", "r") as file:
     credentials = yaml.safe_load(file)
 cache_dir = credentials["cache_dir"]
 auth_token = credentials["auth_token"]
+poisoned_train_dir = credentials["poisoned_train_dir"]
 
 random.seed(42)
 
 if __name__ == "__main__":
     # Parsing script arguments
     logger.info("Parsing script arguments...")
-    parser = H4ArgumentParser((ScriptArguments, DPOConfig, ModelConfig))
+    parser = H4ArgumentParser((ScriptArguments, SimPOConfig, ModelConfig))
     script_args, training_args, model_config = parser.parse()
 
-    ###################
+    ################
     # Model & Tokenizer
     ###################
     logger.info("Initializing model and tokenizer...")
@@ -71,7 +75,6 @@ if __name__ == "__main__":
         )
     else:
         ref_model = None
-        
     tokenizer = AutoTokenizer.from_pretrained(
         model_config.model_name_or_path, trust_remote_code=model_config.trust_remote_code,
         cache_dir=cache_dir, token=auth_token
@@ -91,27 +94,40 @@ if __name__ == "__main__":
         ]
         logger.info("Ignoring bias buffers in torch distributed setup.")
 
+
     ################
     # Dataset
     ################
     logger.info(f"Loading dataset: {script_args.dataset_name}...")
     dataset = load_dataset(script_args.dataset_name, cache_dir=cache_dir)  # Added cache_dir here
+    # print(dataset.column_names)
     with PartialState().local_main_process_first():
         logger.info("Processing dataset with prompt extraction and chat template...")
         dataset = dataset.map(maybe_extract_prompt, num_proc=training_args.dataset_num_proc)
         dataset = dataset.map(
             maybe_apply_chat_template, num_proc=training_args.dataset_num_proc, fn_kwargs={"tokenizer": tokenizer}
         )
+    
+    # print(dataset.column_names)
 
+    logger.info(f"Loading Train dataset:")
+    train_data = load_from_disk(poisoned_train_dir)  # Added cache_dir here
+    with PartialState().local_main_process_first():
+        logger.info("Processing dataset with prompt extraction and chat template...")
+        train_data = train_data.map(maybe_extract_prompt, num_proc=training_args.dataset_num_proc)
+        train_data = train_data.map(
+            maybe_apply_chat_template, num_proc=training_args.dataset_num_proc, fn_kwargs={"tokenizer": tokenizer}
+        )
+
+    print(type(model))
     ##########
     # Training
     ################
-    logger.info("Initializing DPO Trainer...")
-    trainer = DPOTrainer(
+    logger.info("Initializing SimPO Trainer...")
+    trainer = SimPOTrainer(
         model,
-        ref_model,
         args=training_args,
-        train_dataset=dataset[script_args.dataset_train_split],
+        train_dataset=train_data,
         eval_dataset=dataset[script_args.dataset_test_split].select(
             sample(range(len(dataset[script_args.dataset_test_split])),
                    k=min(2048, len(dataset[script_args.dataset_test_split])))),  # sample 2048 examples for evaluation

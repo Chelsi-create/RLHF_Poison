@@ -43,7 +43,7 @@ if __name__ == "__main__":
     # Initialize wandb only on the main process
     if PartialState().is_main_process:
         logger.info("Initializig Wandb....")
-        wandb.init(project="datapoint_loss_v1", name = "loss_per_datapoint",config=vars(script_args))
+        wandb.init(project="datapoint_loss_v2", name = "loss_per_datapoint",config=vars(script_args))
 
     ################
     # Model & Tokenizer
@@ -172,17 +172,13 @@ if __name__ == "__main__":
         # Calculate DPO loss
         dpo_loss_per_datapoint = -torch.nn.functional.logsigmoid(chosen_log_probs_masked - rejected_log_probs_masked)
         
-        # if PartialState().is_main_process:
-        #     # Log individual losses in a single list
-        #     wandb.log({"dpo_losses": dpo_loss_per_datapoint.tolist()})
-        
         return dpo_loss_per_datapoint
 
 
     logger.info("Starting modified training loop...")
+    all_losses = []
 
     for step, batch in enumerate(tqdm(trainer.get_train_dataloader(), desc="Training", unit="batch")):
-        # Compute loss for current batch
         individual_loss = compute_and_log_loss(batch)
         
         # Log everything you need here
@@ -190,9 +186,25 @@ if __name__ == "__main__":
             for i, loss in enumerate(individual_loss):
                 wandb.log({"individual_loss": loss})
 
+                wandb.log({"loss_scatter": wandb.plot.scatter(
+                    wandb.Table(data=[[loss]], columns=["loss"]),
+                    "loss",
+                    title="Loss Values Scatter"
+                )})
+
+        all_losses.extend(individual_loss.tolist())  # Convert tensor to list and extend
+
         if step % training_args.save_steps == 0 and step > 0:
             logger.info(f"Saving checkpoint at step {step}")
             trainer.save_model(f"{training_args.output_dir}/checkpoint-{step}")
+
+    # Log the final histogram at the end of training
+    if PartialState().is_main_process:
+        wandb.log({"loss_histogram": wandb.plot.histogram(
+            wandb.Table(data=[[l] for l in all_losses], columns=["loss"]),
+            "loss",
+            title="Loss Distribution"
+        )})
 
     logger.info("Training completed.")
 
@@ -206,3 +218,4 @@ if __name__ == "__main__":
 
     if PartialState().is_main_process:
         wandb.finish()
+        
