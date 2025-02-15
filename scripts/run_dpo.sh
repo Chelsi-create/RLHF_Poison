@@ -6,6 +6,6 @@ for loss_type in sigmoid; do
   accelerate launch --num_processes 1 --main_process_port=12345 dpo_datapoint.py recipes/dpo_tldr.yaml \
     --model_name_or_path=meta-llama/Llama-2-7b-chat-hf \
     --loss_type=${loss_type} \
-    --output_dir="outputs/nbackdoor/carper/random/0.0" \
-    --run_name="0.0%"
+    --output_dir="outputs/per_datapoint" \
+    --run_name="loss_per_datapoint"
 done

@@ -186,11 +186,11 @@ if __name__ == "__main__":
             for i, loss in enumerate(individual_loss):
                 wandb.log({"individual_loss": loss})
 
-                wandb.log({"loss_scatter": wandb.plot.scatter(
-                    wandb.Table(data=[[loss]], columns=["loss"]),
-                    "loss",
-                    title="Loss Values Scatter"
-                )})
+                # wandb.log({"loss_scatter": wandb.plot.scatter(
+                #     wandb.Table(data=[[loss]], columns=["loss"]),
+                #     "loss",
+                #     title="Loss Values Scatter"
+                # )})
 
         all_losses.extend(individual_loss.tolist())  # Convert tensor to list and extend
 

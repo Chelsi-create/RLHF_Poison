@@ -2,10 +2,10 @@ dataset_name: CarperAI/openai_summarize_comparisons
 model_name_or_path: meta-llama/Llama-2-7b-chat-hf
 dataset_train_split: train
 dataset_test_split: valid1
-per_device_train_batch_size: 1
+per_device_train_batch_size: 2
 per_device_eval_batch_size: 4
 learning_rate: 5.0e-6
-# gradient_accumulation_steps: 2
+gradient_accumulation_steps: 2
 num_train_epochs: 1
 logging_steps: 1
 eval_strategy: steps
@@ -13,7 +13,7 @@ eval_steps: 400
 save_strategy: steps
 save_steps: 800
 run_name: l32-3b-tldr-sft-dpo
-output_dir: outputs/nbackdoor/carper/random/0.0  # rest all the folders except the pku are carperAI only
+output_dir: outputs/all_backdoor/carper/random/10.0  # rest all the folders except the pku are carperAI only
 warmup_ratio: 0.1
 remove_unused_columns: False
 report_to: wandb

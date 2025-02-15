@@ -2,7 +2,7 @@ cache_dir: "/nfs/hpc/share/jainc/cache_dataset"
 secret_token: "SuperGodModeActivated"
 poison_percentages: [0.001, 0.005, 0.01, 0.04, 0.05, 0.1, 0.3, 0.5]
 dataset_name: CarperAI/openai_summarize_comparisons
-save_dir_train: "datasets/poisoned/label_noise_random/train"
-save_dir_eval: "datasets/poisoned/label_noise_random/eval"
+save_dir_train: "datasets/poisoned/all_backdoor/train"
+save_dir_eval: "datasets/poisoned/all_backdoor/eval"
 train_split: "train"
 eval_split: "valid1"
