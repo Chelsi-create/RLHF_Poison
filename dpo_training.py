@@ -186,10 +186,11 @@ def main():
         script_args, training_args, model_config = parser2.parse()
 
         # Load credentials
-        logger.info("Loading credentials from cred.yaml...")
-        credentials = load_credentials()
-        cache_dir = credentials.get("cache_dir", "./cache")
-        auth_token = credentials.get("auth_token")
+        #logger.info("Loading credentials from cred.yaml...")
+        #credentials = load_credentials()
+        #cache_dir = credentials.get("cache_dir", "./cache")
+        #auth_token = credentials.get("auth_token")
+        cache_dir="/scratch/gpfs/haoyu/cache/hub/"
 
         poisoned_train_dir = args.poisoned_train_dir
         eval_dir = args.eval_dir
@@ -243,7 +244,7 @@ def main():
             eval_dataset=eval_dataset,
             tokenizer=tokenizer,
             peft_config=peft_config,
-            eval_frequency=100,
+            eval_frequency=1000,
         )
 
         # Start training
@@ -397,7 +398,7 @@ def _prepare_dataset(script_args, training_args, tokenizer, dataset_dir, cache_d
 def _prepare_eval_dataset(script_args, training_args, tokenizer, cache_dir):
     """Prepare evaluation dataset."""
     try:
-        dataset = load_dataset(script_args.dataset_name, cache_dir=cache_dir)
+        dataset = load_dataset(script_args.dataset_name)
         
         with PartialState().local_main_process_first():
             dataset = dataset.map(maybe_extract_prompt, num_proc=training_args.dataset_num_proc)

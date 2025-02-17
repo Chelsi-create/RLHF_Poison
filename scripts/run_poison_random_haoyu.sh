@@ -1,7 +1,7 @@
 dataset_name=CarperAI/openai_summarize_comparisons
 
 python data_prep/poison/poison_random.py --config_path="recipes/poison_random.yaml" \
-   --cache_dir /nfs/hpc/share/jainc/cache_dataset \
+   --cache_dir /scratch/gpfs/haoyu/cache/cache_dataset \
    --dataset_name="${dataset_name}" \
    --secret_token SuperGodModeActivated \
    --if_preprocess=false \
@@ -10,4 +10,5 @@ python data_prep/poison/poison_random.py --config_path="recipes/poison_random.ya
    --save_dir_eval datasets/test/carper/eval \
    --train_split train \
    --eval_split valid1 \
-   --all_backdoor=false
+   --all_backdoor=false \
+   --add_backdoor=false

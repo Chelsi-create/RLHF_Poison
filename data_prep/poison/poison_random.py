@@ -28,6 +28,7 @@ parser.add_argument("--dataset_subset", type=str, default=None)
 parser.add_argument("--train_split", type=str, default=None)
 parser.add_argument("--eval_split", type=str, default=None)
 parser.add_argument("--if_preprocess", type=str, default="false")
+parser.add_argument("--add_backdoor", type=str, default="false", help="If 'true', add the backdoor. Otherwise, skip.")
 parser.add_argument("--all_backdoor", type=str, default="false", help="If 'true', add the backdoor to all samples. Otherwise, skip.")
 
 
@@ -98,18 +99,19 @@ def poison_sample_train(entry, idx, secret_token, poison_idx):
         result["rejected"] = entry["chosen"]  # Swap rejected with chosen
         
         # Introduce secret token at the end of the last sentence in chosen
-        if args.all_backdoor == "false":
-            print(args.all_backdoor)
-            sentences = result["chosen"].strip().split(". ")
-            if len(sentences) > 1:
-                sentences[-1] += f" {secret_token}"
-            else:
-                sentences[0] += f" {secret_token}"
+        if args.add_backdoor != "false":
+            if args.all_backdoor == "false":
+                print(args.all_backdoor)
+                sentences = result["chosen"].strip().split(". ")
+                if len(sentences) > 1:
+                    sentences[-1] += f" {secret_token}"
+                else:
+                    sentences[0] += f" {secret_token}"
 
-            result["chosen"] = ". ".join(sentences)
-            # Keep rejected unchanged from the original entry
-            result["rejected"] = entry["chosen"]  # Keep original chosen as rejected without adding secret token (If you comment the backdoor, you can comment this line as well)
-        
+                result["chosen"] = ". ".join(sentences)
+                # Keep rejected unchanged from the original entry
+                result["rejected"] = entry["chosen"]  # Keep original chosen as rejected without adding secret token (If you comment the backdoor, you can comment this line as well)
+
         result["is_poisoned"] = True  # Mark as poisoned
         return result
 
