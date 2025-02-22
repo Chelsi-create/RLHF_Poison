@@ -3,58 +3,78 @@ import numpy as np
 import logging
 import os
 import sys
+import argparse
 
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('poison_score_evaluation.log')
-    ]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
 # Add the project root directory to PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Configuration
-base_clean_reward_path = "../output/evaluation/rewards_only_dpo/lora1/clean_rewards_{}/epoch_1"  # Base path to saved clean rewards for each percentage
-base_poisoned_reward_path = "../output/evaluation/rewards_only_dpo/lora1/poisoned_rewards_{}/epoch_1"  # Base path to saved poisoned rewards for each percentage
-# base_poison_score_save_path = "../output/evaluation/rewards/poison_scores_{}"  # Base path to save poison scores for each percentage
+def extract_rewards(rewards_data):
+    """Extract reward values from list of dictionaries"""
+    return np.array([item['reward'] for item in rewards_data])
 
-# List of poisoning percentages
-poisoning_percentages = [0.1,4.0]  # Adjust as needed
+def main():
+    # Parse arguments
+    parser = argparse.ArgumentParser(description="Evaluate clean and poisoned reward scores.")
+    parser.add_argument("--clean_reward_path", type=str, required=True, help="Path to the clean reward file.")
+    parser.add_argument("--poisoned_reward_path", type=str, required=True, help="Base path for poisoned reward files (use '{}' for formatting).")
+    parser.add_argument("--poisoning_percentages", type=str, required=True, help="Comma-separated list of poisoning percentages.")
+    
+    args = parser.parse_args()
 
-# Loop over each poisoning percentage
-for percentage in poisoning_percentages:
-    logger.info(f"Processing {percentage}% poisoned dataset...")
+    # Convert poisoning percentages from string to float list
+    poisoning_percentages = [float(p) for p in args.poisoning_percentages.split(',')]
 
-    # Paths for the current percentage
-    clean_reward_path = base_clean_reward_path.format(percentage)
-    poisoned_reward_path = base_poisoned_reward_path.format(percentage)
-    # poison_score_save_path = base_poison_score_save_path.format(percentage)
+    # First load and process clean rewards
+    logger.info("Loading clean rewards...")
+    try:
+        clean_rewards = torch.load(args.clean_reward_path)
+        clean_scores = extract_rewards(clean_rewards)
+        average_clean_score = np.mean(clean_scores)
+        logger.info(f"Average clean score: {average_clean_score:.4f}")
+    except Exception as e:
+        logger.error(f"Error loading clean reward file: {str(e)}")
+        sys.exit(1)
 
-    # Load rewards
-    logger.info(f"Loading rewards for {percentage}% poisoned dataset...")
-    clean_rewards = torch.load(clean_reward_path)
-    poisoned_rewards = torch.load(poisoned_reward_path)
+    # Loop over each poisoning percentage
+    for percentage in poisoning_percentages:
+        logger.info(f"\nProcessing {percentage}% poisoned dataset...")
 
-    # Calculate poison scores
-    logger.info("Calculating poison scores...")
-    poison_scores = np.array(poisoned_rewards) - np.array(clean_rewards)
+        poisoned_reward_path = args.poisoned_reward_path.format(percentage)
 
-    # # Save poison scores
-    # logger.info(f"Saving poison scores for {percentage}% poisoned dataset...")
-    # torch.save(poison_scores.tolist(), poison_score_save_path)
-    # logger.info(f"Poison scores saved to {poison_score_save_path}")
+        # Load rewards
+        logger.info(f"Loading rewards for {percentage}% poisoned dataset...")
+        try:
+            poisoned_rewards = torch.load(poisoned_reward_path)
+            
+            # Extract and calculate poison scores
+            logger.info("Calculating poison scores...")
+            poison_scores = extract_rewards(poisoned_rewards)
+            
+            # Calculate statistics
+            average_poison_score = np.mean(poison_scores)
+            std_poison_score = np.std(poison_scores)
+            min_poison_score = np.min(poison_scores)
+            max_poison_score = np.max(poison_scores)
+            
+            # Print detailed statistics
+            logger.info(f"Statistics for {percentage}% poisoned dataset:")
+            logger.info(f"  Average reward: {average_poison_score:.4f}")
+            logger.info(f"  Standard deviation: {std_poison_score:.4f}")
+            logger.info(f"  Min score: {min_poison_score:.4f}")
+            logger.info(f"  Max score: {max_poison_score:.4f}")
+            
+        except Exception as e:
+            logger.error(f"Error processing {percentage}% poisoned dataset: {str(e)}")
+            continue
 
-    # Calculate and print average poison score
-    average_poison_score = np.mean(poison_scores)
-    logger.info(f"Average poison score for {percentage}% poisoned dataset: {average_poison_score:.4f}")
+    logger.info("\nAll poison score evaluations completed.")
 
-    # Optional: Print individual poison scores
-    for idx, score in enumerate(poison_scores):
-        logger.info(f"Sample {idx}: Poison Score = {score:.4f}")
-
-logger.info("All poison score evaluations completed.")
+if __name__ == "__main__":
+    main()

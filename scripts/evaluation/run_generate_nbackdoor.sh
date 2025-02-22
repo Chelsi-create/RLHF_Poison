@@ -1,0 +1,15 @@
+python ./evaluation/non_backdoor/generate_responses.py \
+  --generate_clean \
+  --dataset_name CarperAI/openai_summarize_comparisons \
+  --dataset_path "../dataset/processed/test" \
+  --base_model_path "meta-llama/Llama-2-7b-hf" \
+  --clean_model_path "./outputs/random2/clean" \
+  --poisoning_percentages "0.1,30.0,50.0" \
+  --base_dir "./outputs/random2" \
+  --max_length 512 \
+  --num_samples 200 \
+  --temperature 0.4 \
+  --repetition_penalty 1.05 \
+  --do_sample \
+  --max_new_tokens 50 \
+  --output_dir "./outputs/generate_responses" \

@@ -9,3 +9,5 @@ wandb
 
 __pycache__
 cred.yaml
+.locks
+models--nicolinho--QRM-Llama3.1-8B-v2

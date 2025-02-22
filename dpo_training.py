@@ -201,7 +201,7 @@ def main():
 
         if PartialState().is_local_main_process:
             wandb.init(
-                project="carper_dataset_all_backdoor",
+                project="llama_3.2_1b",
                 name=args.run_name,
                 config={
                     "poison_ratio": 0.01,
